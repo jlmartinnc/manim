@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 
 import numpy as np
+import pytest
 
 from manim import (
     DEGREES,
@@ -12,9 +13,11 @@ from manim import (
     ORIGIN,
     RIGHT,
     UP,
+    Angle,
     BackgroundRectangle,
     Circle,
     Line,
+    Polygon,
     Polygram,
     Sector,
     Square,
@@ -23,6 +26,33 @@ from manim import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+@pytest.mark.parametrize("frame_rate", [20, 30])
+def test_line_stays_straight_when_repeatedly_shrunk_and_expanded(frame_rate):
+    line = Line(end=(1, 0, 0))
+    start = np.array([3.4, 0, 0])
+
+    for angle in np.linspace(0.1 * np.pi, 12.1 * np.pi, 6 * frame_rate + 1):
+        end = start + 1.5 * np.cos(angle) * np.array([1, 1, 0])
+        line.put_start_and_end_on(start, end)
+
+        np.testing.assert_allclose(
+            line.points,
+            np.linspace(start, end, len(line.points)),
+            atol=1e-12,
+            rtol=0,
+        )
+
+
+@pytest.mark.parametrize("length", [0, 1e-12])
+def test_curved_line_can_expand_after_nearly_collapsing(length):
+    line = Line(path_arc=np.pi / 3)
+    line.put_start_and_end_on([3.4, 0, 0], [3.4 + length, length, 0])
+    line.put_start_and_end_on(ORIGIN, RIGHT + UP)
+
+    expected = Line(ORIGIN, RIGHT + UP, path_arc=np.pi / 3)
+    np.testing.assert_allclose(line.points, expected.points, atol=1e-12, rtol=0)
 
 
 def test_get_arc_center():
@@ -263,3 +293,46 @@ def test_Circle_point_at_angle():
     # Angle 0 should return start point even after reflection
     p_reflected_0 = reflected_circle.point_at_angle(0)
     np.testing.assert_array_almost_equal(p_reflected_0, reflected_start, decimal=5)
+
+
+def test_angle_parallel_lines_returns_empty():
+    # Regression test for https://github.com/ManimCommunity/manim/issues/1930
+    # When two lines are parallel or collinear, line_intersection raises
+    # ValueError.  Angle should gracefully become an empty Mobject instead
+    # of propagating the error.
+    # Collinear lines (infinitely many intersections)
+    l1 = Line(LEFT, RIGHT)
+    l2 = Line(LEFT * 0.5, RIGHT * 0.5)
+    angle = Angle(l1, l2)
+    assert not angle.has_points()
+    assert angle.get_value() == 0
+
+    # Parallel but non-collinear lines (no intersection)
+    l3 = Line(UP, UP + RIGHT)
+    l4 = Line(DOWN, DOWN + RIGHT)
+    angle2 = Angle(l3, l4)
+    assert not angle2.has_points()
+    assert angle2.get_value() == 0
+
+
+def test_angle_non_xy_lines_raise():
+    l1 = Line([0, 0, 1], [1, 0, 1])
+    l2 = Line([0, 0, 1], [0, 1, 1])
+
+    with pytest.raises(ValueError, match="xy-plane"):
+        Angle(l1, l2)
+
+
+def test_round_corners_collinear_points_stays_finite():
+    # Regression test for https://github.com/ManimCommunity/manim/issues/3052
+    # Collinear vertices create a (near) 180 degree turn at a corner, which
+    # makes ``tan(angle / 2)`` diverge to infinity.  This previously produced
+    # either astronomically large coordinates (default mode) or an 8.70 PiB
+    # ``MemoryError`` when anchors were evenly distributed.
+    for kwargs in ({}, {"evenly_distribute_anchors": True}):
+        poly = Polygon([-1, 0, 0], [0, 0, 0], [1, 0, 0])
+        poly.round_corners(0.15, **kwargs)
+        assert np.all(np.isfinite(poly.points))
+        # The rounded corner is bounded by half the shorter adjacent edge, so
+        # no coordinate should blow up beyond the original extent.
+        assert np.max(np.abs(poly.points)) <= 1.0

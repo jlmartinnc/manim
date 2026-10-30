@@ -336,15 +336,16 @@ class Arc(TipableVMobject):
         self._failed_to_get_center: bool = False
         super().__init__(**kwargs)
 
-    def generate_points(self) -> None:
+    def generate_points(self) -> Self:
         self._set_pre_positioned_points()
         self.scale(self.radius, about_point=ORIGIN)
         self.shift(self.arc_center)
+        return self
 
     # Points are set a bit differently when rendering via OpenGL.
     # TODO: refactor Arc so that only one strategy for setting points
     # has to be used.
-    def init_points(self) -> None:
+    def init_points(self) -> Self:
         self.set_points(
             Arc._create_quadratic_bezier_points(
                 angle=self.angle,
@@ -354,6 +355,7 @@ class Arc(TipableVMobject):
         )
         self.scale(self.radius, about_point=ORIGIN)
         self.shift(self.arc_center)
+        return self
 
     @staticmethod
     def _create_quadratic_bezier_points(
@@ -501,10 +503,23 @@ class ArcBetweenPoints(Arc):
 
 
 class TangentialArc(ArcBetweenPoints):
-    """
-    Construct an arc that is tangent to two intersecting lines.
-    You can choose any of the 4 possible corner arcs via the `corner` tuple.
-    corner = (s1, s2) where each si is ±1 to control direction along each line.
+    """A tangential arc, that is, an arc tangent to two intersecting lines.
+
+    Use ``corner = (s1, s2)`` to choose one of the four possible corner arcs.
+    Each sign is ±1 and controls the direction along the corresponding line.
+
+    Parameters
+    ----------
+    line1
+        The first line.
+    line2
+        The second line.
+    radius
+        The radius of the arc.
+    corner
+        Choose which corner to draw, use one of (1, 1), (1, -1), (-1, 1) and (-1, -1).
+    kwargs
+        Additional arguments to be passed to :class:`Arc`
 
     Examples
     --------
@@ -998,7 +1013,7 @@ class AnnularSector(Arc):
             **kwargs,
         )
 
-    def generate_points(self) -> None:
+    def generate_points(self) -> Self:
         inner_arc, outer_arc = (
             Arc(
                 start_angle=self.start_angle,
@@ -1013,9 +1028,11 @@ class AnnularSector(Arc):
         self.add_line_to(outer_arc.points[0])
         self.append_points(outer_arc.points)
         self.add_line_to(inner_arc.points[0])
+        return self
 
-    def init_points(self) -> None:
+    def init_points(self) -> Self:
         self.generate_points()
+        return self
 
 
 class Sector(AnnularSector):
@@ -1080,7 +1097,7 @@ class Annulus(Circle):
             fill_opacity=fill_opacity, stroke_width=stroke_width, color=color, **kwargs
         )
 
-    def generate_points(self) -> None:
+    def generate_points(self) -> Self:
         self.radius = self.outer_radius
         outer_circle = Circle(radius=self.outer_radius)
         inner_circle = Circle(radius=self.inner_radius)
@@ -1088,9 +1105,11 @@ class Annulus(Circle):
         self.append_points(outer_circle.points)
         self.append_points(inner_circle.points)
         self.shift(self.arc_center)
+        return self
 
-    def init_points(self) -> None:
+    def init_points(self) -> Self:
         self.generate_points()
+        return self
 
 
 class CubicBezier(VMobject, metaclass=ConvertToOpenGL):

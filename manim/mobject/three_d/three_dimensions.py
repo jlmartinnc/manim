@@ -379,19 +379,64 @@ class Sphere(Surface):
         class ExampleSphere(ThreeDScene):
             def construct(self):
                 self.set_camera_orientation(phi=PI / 6, theta=PI / 6)
-                sphere1 = Sphere(
-                    center=(3, 0, 0),
-                    radius=1,
-                    resolution=(20, 20),
-                    u_range=[0.001, PI - 0.001],
-                    v_range=[0, TAU]
-                )
+                sphere1 = Sphere(center=(3, 0, 0), radius=1, resolution=(20, 20))
                 sphere1.set_color(RED)
                 self.add(sphere1)
                 sphere2 = Sphere(center=(-1, -3, 0), radius=2, resolution=(18, 18))
                 sphere2.set_color(GREEN)
                 self.add(sphere2)
                 sphere3 = Sphere(center=(-1, 2, 0), radius=2, resolution=(16, 16))
+                sphere3.set_color(BLUE)
+                self.add(sphere3)
+
+    This example shows that overlapping spheres can intersect with rough transitions.
+
+    .. manim:: ExampleSphereOverlap
+        :save_last_frame:
+
+        class ExampleSphereOverlap(ThreeDScene):
+            def construct(self):
+                self.set_camera_orientation(phi=PI / 4, theta=PI / 4)
+                sphere1 = Sphere(center=(0, 0, 0), radius=1, resolution=(20, 20))
+                sphere1.set_color(RED)
+                self.add(sphere1)
+                sphere2 = Sphere(center=(-0.5, -1, 0.5), radius=1.2, resolution=(20, 20))
+                sphere2.set_color(GREEN)
+                self.add(sphere2)
+                sphere3 = Sphere(center=(1, -1, 0), radius=1.1, resolution=(20, 20))
+                sphere3.set_color(BLUE)
+                self.add(sphere3)
+
+    In this example, by modifying ``u_range`` (the range of the azimuthal angle) and
+    ``v_range`` (the range of the polar angle), it is possible to obtain a portion of a
+    sphere:
+
+    .. manim:: ExamplePartialSpheres
+        :save_last_frame:
+
+        class ExamplePartialSpheres(ThreeDScene):
+            def construct(self):
+                self.set_camera_orientation(phi=PI / 4)
+                sphere1 = Sphere(
+                    center=(-3, 0, 0),
+                    resolution=(10, 20),
+                    u_range=[TAU / 4, 3 * TAU / 4],
+                )
+                sphere1.set_color(RED)
+                self.add(sphere1)
+                sphere2 = Sphere(
+                    center=(0, 0, 0),
+                    resolution=(20, 10),
+                    v_range=[0, TAU / 4],
+                )
+                sphere2.set_color(GREEN)
+                self.add(sphere2)
+                sphere3 = Sphere(
+                    center=(3, 0, 0),
+                    resolution=(5, 10),
+                    u_range=[3 * TAU / 4, TAU],
+                    v_range=[TAU / 4, TAU / 2],
+                )
                 sphere3.set_color(BLUE)
                 self.add(sphere3)
     """
@@ -529,7 +574,7 @@ class Cube(VGroup):
             **kwargs,
         )
 
-    def generate_points(self) -> None:
+    def generate_points(self) -> Self:
         """Creates the sides of the :class:`Cube`."""
         for vect in IN, OUT, LEFT, RIGHT, UP, DOWN:
             face = Square(
@@ -542,9 +587,11 @@ class Cube(VGroup):
             face.apply_matrix(z_to_vector(vect))
 
             self.add(face)
+        return self
 
-    def init_points(self) -> None:
+    def init_points(self) -> Self:
         self.generate_points()
+        return self
 
 
 class Prism(Cube):
@@ -578,11 +625,12 @@ class Prism(Cube):
         self.dimensions = dimensions
         super().__init__(**kwargs)
 
-    def generate_points(self) -> None:
+    def generate_points(self) -> Self:
         """Creates the sides of the :class:`Prism`."""
         super().generate_points()
         for dim, value in enumerate(self.dimensions):
             self.rescale_to_fit(value, dim, stretch=True)
+        return self
 
 
 class Cone(Surface):
@@ -722,7 +770,7 @@ class Cone(Surface):
         self._current_theta = theta
         self._current_phi = phi
 
-    def set_direction(self, direction: Vector3DLike) -> None:
+    def set_direction(self, direction: Vector3DLike) -> Self:
         """Changes the direction of the apex of the :class:`Cone`.
 
         Parameters
@@ -732,6 +780,7 @@ class Cone(Surface):
         """
         self.direction = np.array(direction)
         self._rotate_to_direction()
+        return self
 
     def get_direction(self) -> Vector3D:
         """Returns the current direction of the apex of the :class:`Cone`.
@@ -830,7 +879,7 @@ class Cylinder(Surface):
         r = self.radius
         return np.array([r * np.cos(phi), r * np.sin(phi), height])
 
-    def add_bases(self) -> None:
+    def add_bases(self) -> Self:
         """Adds the end caps of the cylinder."""
         opacity: float
         if config.renderer == RendererType.OPENGL:
@@ -858,6 +907,7 @@ class Cylinder(Surface):
         )
         self.base_bottom.shift(self.u_range[0] * IN)
         self.add(self.base_top, self.base_bottom)
+        return self
 
     def _rotate_to_direction(self) -> None:
         x, y, z = self.direction
@@ -889,7 +939,7 @@ class Cylinder(Surface):
         self._current_theta = theta
         self._current_phi = phi
 
-    def set_direction(self, direction: Vector3DLike) -> None:
+    def set_direction(self, direction: Vector3DLike) -> Self:
         """Sets the direction of the central axis of the :class:`Cylinder`.
 
         Parameters
@@ -901,6 +951,7 @@ class Cylinder(Surface):
         #     pass
         self.direction = direction
         self._rotate_to_direction()
+        return self
 
     def get_direction(self) -> np.ndarray:
         """Returns the direction of the central axis of the :class:`Cylinder`.
@@ -969,7 +1020,7 @@ class Line3D(Cylinder):
 
     def set_start_and_end_attrs(
         self, start: Point3DLike, end: Point3DLike, **kwargs: Any
-    ) -> None:
+    ) -> Self:
         """Sets the start and end points of the line.
 
         If either ``start`` or ``end`` are :class:`Mobjects <.Mobject>`,
@@ -1000,6 +1051,7 @@ class Line3D(Cylinder):
             **kwargs,
         )
         self.shift((self.start + self.end) / 2)
+        return self
 
     def pointify(
         self,
